@@ -39,7 +39,7 @@ dbs_demo/
 
 ---
 
-## 🚀 How to Run Locally
+## How to Run Locally
 1. Start Kafka cluster:
    ```bash
    docker-compose up -d
@@ -52,3 +52,23 @@ dbs_demo/
 4. Run consumer:
   ```bash
    python consumer.py
+
+---
+
+## CI/CD Workflow
+- Commit code to main branch.
+- GitHub Actions pipeline builds Docker image.
+- Image pushed to DockerHub.
+- Kubernetes cluster redeploys updated consumer/producer pods.
+- Logs show deduplication, retries, and DLQ handling.
+
+## Demo Storyline
+- Drop JSON batch files into extract/.
+- Kafka ingests files into topics (orders, payments, locations).
+- Consumer processes records:
+  - Deduplicates duplicates
+  - Detects updates
+  - Retries failures
+  - Sends unprocessable records to DLQ
+- Files moved to archive/ with _done suffix
+- GitHub Actions pipeline ensures every commit automatically redeploys apps.
