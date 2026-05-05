@@ -44,8 +44,11 @@ dbs_demo/
    ```bash
    docker-compose up -d
 2. Generate sample files:
+   ```bash
    ./generate_files.sh
 4. Run producer:
+   ```bash
   python producer.py
-5. Run consumer:
+6. Run consumer:
+  ```bash
    python consumer.py
