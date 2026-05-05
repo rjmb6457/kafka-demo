@@ -46,9 +46,9 @@ dbs_demo/
 2. Generate sample files:
    ```bash
    ./generate_files.sh
-4. Run producer:
+3. Run producer:
    ```bash
-  python producer.py
-6. Run consumer:
+   python producer.py
+4. Run consumer:
   ```bash
    python consumer.py
