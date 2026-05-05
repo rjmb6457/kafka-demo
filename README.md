@@ -43,16 +43,19 @@ dbs_demo/
 1. Start Kafka cluster:
    ```bash
    docker-compose up -d
+   ```
 2. Generate sample files:
    ```bash
    ./generate_files.sh
+   ```
 3. Run producer:
    ```bash
    python producer.py
+   ```
 4. Run consumer:
   ```bash
    python consumer.py
-
+```
 ---
 
 ## CI/CD Workflow
