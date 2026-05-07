@@ -27,13 +27,13 @@ jobs:
     # Step 4: Build and push consumer image
     - name: Build and push consumer image
       run: |
-        docker build -t ${{ secrets.DOCKER_USERNAME }}/consumer:latest ./consumer
+        docker build -t ${{ secrets.DOCKER_USERNAME }}/consumer:latest -f consumer/Dockerfile .
         docker push ${{ secrets.DOCKER_USERNAME }}/consumer:latest
 
     # Step 5: Build and push producer image
     - name: Build and push producer image
       run: |
-        docker build -t ${{ secrets.DOCKER_USERNAME }}/producer:latest ./producer
+        docker build -t ${{ secrets.DOCKER_USERNAME }}/producer:latest -f producer/Dockerfile .
         docker push ${{ secrets.DOCKER_USERNAME }}/producer:latest
 
     # Step 6: Set up kubectl (Kubernetes CLI)
