@@ -27,7 +27,7 @@ jobs:
     # Step 4: Build and push consumer image
     - name: Build and push consumer image
       run: |
-        docker build -t ${{ secrets.DOCKER_USERNAME }}/consumer:latest ./consumer
+        docker build -t ${{ secrets.DOCKER_USERNAME }}/consumer:latest -f consumer/Dockerfile .
         docker push ${{ secrets.DOCKER_USERNAME }}/consumer:latest
 
     # Step 5: Build and push producer image
