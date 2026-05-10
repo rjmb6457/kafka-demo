@@ -7,11 +7,11 @@ spec:
     spec:
       containers:
       - name: kafka-init
-        image: bitnami/kafka:3.7.0
+        image: confluentinc/cp-kafka:7.5.0   # match your Kafka deployment image
         command: ["bash", "-c"]
         args:
           - |
-            kafka-topics.sh --create --if-not-exists \
+            kafka-topics --create --if-not-exists \
               --topic transactions-dlq \
               --bootstrap-server kafka:9092 \
               --partitions 1 --replication-factor 1
