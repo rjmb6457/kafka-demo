@@ -25,18 +25,18 @@ jobs:
 
     - name: Build & Push Producer
       run: |
-        docker build -t gcr.io/kafka-demo-rjmb/producer:latest -f producer/Dockerfile .
+        docker build -t gcr.io/kafka-demo-rjmb/producer:latest -f producer/Dockerfile producer/
         docker push gcr.io/kafka-demo-rjmb/producer:latest
 
     - name: Build & Push Consumer
       run: |
-        docker build -t gcr.io/kafka-demo-rjmb/consumer:latest -f consumer/Dockerfile .
+        docker build -t gcr.io/kafka-demo-rjmb/consumer:latest -f consumer/Dockerfile consumer/
         docker push gcr.io/kafka-demo-rjmb/consumer:latest
 
     - name: Build & Push DLQ Reprocessor
       run: |
-        docker build -t gcr.io/kafka-demo-rjmb/reprocessor:latest -f dlq-reprocessor/Dockerfile .
-        docker push gcr.io/kafka-demo-rjmb/reprocessor:latest
+        docker build -t gcr.io/kafka-demo-rjmb/reprocessor:latest -f reprocessor/Dockerfile reprocessor/
+        docker  push gcr.io/kafka-demo-rjmb/reprocessor:latest
 
     - name: Deploy to GKE
       run: |
