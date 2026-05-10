@@ -1,4 +1,4 @@
-name: CI/CD Pipeline
+name: Deploy to GKE
 
 on:
   push:
@@ -10,35 +10,41 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repo
-      uses: actions/checkout@v3
+      - name: Checkout source
+        uses: actions/checkout@v3
 
-    - name: Set up gcloud
-      uses: google-github-actions/setup-gcloud@v2
-      with:
-        project_id: kafka-demo-rjmb
-        service_account_key: ${{ secrets.GCP_SA_KEY }}
-        export_default_credentials: true
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: kafka-demo-rjmb
+          service_account_key: ${{ secrets.GCP_SA_KEY }}
+          export_default_credentials: true
 
-    - name: Configure Docker for GCR
-      run: gcloud auth configure-docker gcr.io --quiet
+      - name: Authenticate Service Account
+        run: |
+          echo "${{ secrets.GCP_SA_KEY }}" > ${HOME}/gcp-key.json
+          gcloud auth activate-service-account --key-file=${HOME}/gcp-key.json
+          gcloud config set project kafka-demo-rjmb
 
-    - name: Build & Push Producer
-      run: |
-        docker build -t gcr.io/kafka-demo-rjmb/producer:latest -f producer/Dockerfile producer/
-        docker push gcr.io/kafka-demo-rjmb/producer:latest
+      - name: Configure Docker for GCR
+        run: gcloud auth configure-docker gcr.io --quiet
 
-    - name: Build & Push Consumer
-      run: |
-        docker build -t gcr.io/kafka-demo-rjmb/consumer:latest -f consumer/Dockerfile consumer/
-        docker push gcr.io/kafka-demo-rjmb/consumer:latest
+      - name: Build & Push Producer
+        run: |
+          docker build -t gcr.io/kafka-demo-rjmb/producer:latest -f producer/Dockerfile producer/
+          docker push gcr.io/kafka-demo-rjmb/producer:latest
 
-    - name: Build & Push DLQ Reprocessor
-      run: |
-        docker build -t gcr.io/kafka-demo-rjmb/reprocessor:latest -f reprocessor/Dockerfile reprocessor/
-        docker  push gcr.io/kafka-demo-rjmb/reprocessor:latest
+      - name: Build & Push Consumer
+        run: |
+          docker build -t gcr.io/kafka-demo-rjmb/consumer:latest -f consumer/Dockerfile consumer/
+          docker push gcr.io/kafka-demo-rjmb/consumer:latest
 
-    - name: Deploy to GKE
-      run: |
-        gcloud container clusters get-credentials kafka-demo-cluster --zone asia-southeast1-a
-        kubectl apply -f k8s/
+      - name: Build & Push Reprocessor
+        run: |
+          docker build -t gcr.io/kafka-demo-rjmb/reprocessor:latest -f dlq-reprocessor/Dockerfile dlq-reprocessor/
+          docker push gcr.io/kafka-demo-rjmb/reprocessor:latest
+
+      - name: Deploy to GKE
+        run: |
+          gcloud container clusters get-credentials kafka-demo-cluster --zone asia-southeast1-a --project kafka-demo-rjmb
+          kubectl apply -f k8s/demo-stack.yaml
