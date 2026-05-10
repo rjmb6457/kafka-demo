@@ -41,7 +41,7 @@ jobs:
 
       - name: Build & Push Reprocessor
         run: |
-          docker build -t gcr.io/kafka-demo-rjmb/reprocessor:latest -f dlq-reprocessor/Dockerfile dlq-reprocessor/
+          docker build -t gcr.io/kafka-demo-rjmb/reprocessor:latest -f reprocessor/Dockerfile reprocessor/
           docker push gcr.io/kafka-demo-rjmb/reprocessor:latest
 
       - name: Deploy to GKE
