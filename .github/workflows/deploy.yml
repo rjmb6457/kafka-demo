@@ -22,7 +22,7 @@ jobs:
 
       - name: Authenticate Service Account
         run: |
-          printf '%s' "${{ secrets.GCP_SA_KEY }}" > gcp-key.json
+          echo "${{ secrets.GCP_SA_KEY }}" > gcp-key.json
           gcloud auth activate-service-account --key-file=gcp-key.json
           gcloud config set project kafka-demo-rjmb
 
