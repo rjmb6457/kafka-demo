@@ -13,6 +13,6 @@ spec:
           - |
             kafka-topics --create --if-not-exists \
               --topic transactions-dlq \
-              --bootstrap-server kafka:9092 \
+              --bootstrap-server kafka-service:9092 \
               --partitions 1 --replication-factor 1
       restartPolicy: OnFailure
