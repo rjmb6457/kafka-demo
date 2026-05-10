@@ -7,7 +7,7 @@ spec:
     spec:
       containers:
       - name: kafka-init
-        image: confluentinc/cp-kafka:7.5.0   # match your Kafka deployment image
+        image: confluentinc/cp-kafka:7.5.0
         command: ["bash", "-c"]
         args:
           - |
