@@ -4,13 +4,19 @@ metadata:
   name: debug-pod
 spec:
   containers:
-    - name: debug
-      image: busybox
-      command: ["sh", "-c", "sleep 3600"]
-      volumeMounts:
-        - name: txn-data
-          mountPath: /mnt/data
+  - name: debug
+    image: busybox
+    command: ["sh", "-c", "sleep 3600"]
+    volumeMounts:
+    - name: data-volume
+      mountPath: /mnt/data
+    - name: archive-volume
+      mountPath: /mnt/archive
+  restartPolicy: Never
   volumes:
-    - name: txn-data
-      persistentVolumeClaim:
-        claimName: data-pvc
+  - name: data-volume
+    persistentVolumeClaim:
+      claimName: data-pvc
+  - name: archive-volume
+    persistentVolumeClaim:
+      claimName: archive-pvc
