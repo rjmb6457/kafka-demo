@@ -18,9 +18,9 @@ spec:
         command: ["sh", "-c", "sleep 3600"]
         volumeMounts:
         - name: data-volume
-          mountPath: /mnt/data
+          mountPath: /app/extract
         - name: archive-volume
-          mountPath: /mnt/archive
+          mountPath: /app/archive
       restartPolicy: Always
       volumes:
       - name: data-volume
