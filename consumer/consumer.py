@@ -1,87 +1,84 @@
-import json
-import time
 from kafka import KafkaConsumer, KafkaProducer
-from kafka.errors import KafkaError
+import json
 
-# --- Kafka Consumer ---
+# Subscribe to both main and DLQ topics
 consumer = KafkaConsumer(
-    'order', 'payment', 'location',
-    bootstrap_servers='localhost:9092',
-    value_deserializer=lambda m: json.loads(m.decode('utf-8')),
-    auto_offset_reset='earliest',
-    enable_auto_commit=True,
-    group_id='demo-consumer-group'
+    "transactions", "transactions-dlq",
+    bootstrap_servers="kafka-service:9092",
+    auto_offset_reset="earliest",
+    enable_auto_commit=False,
+    value_deserializer=lambda v: json.loads(v.decode("utf-8"))
 )
 
-# --- Kafka Producer for DLQ ---
-dlq_producer = KafkaProducer(
-    bootstrap_servers='localhost:9092',
-    value_serializer=lambda v: json.dumps(v).encode('utf-8')
+producer = KafkaProducer(
+    bootstrap_servers="kafka-service:9092",
+    value_serializer=lambda v: json.dumps(v).encode("utf-8")
 )
 
-# --- Fault Tolerance Settings ---
-MAX_RETRIES = 3
+# Track processed records by msg_id
+processed_records = {}  # msg_id -> last payload
 
-# --- State Tracking ---
-seen_records = {}
-stats = {"new": 0, "duplicate": 0, "update": 0, "dlq": 0, "errors": 0}
+# Counters for reporting
+new_count = updated_count = duplicate_count = retry_count = dlq_count = reprocess_count = 0
 
-# --- Processing Function with Retries ---
-def process_record(record):
-    for attempt in range(MAX_RETRIES):
-        try:
-            # Simulate business logic (replace with real processing)
-            if "id" not in record:
-                raise ValueError("Missing ID field")
-            return True
-        except Exception as e:
-            print(f"Retry {attempt+1} failed for record {record}: {e}")
-            time.sleep(1)
-    return False
+def process_message(msg):
+    # Simulate failure for high-value transactions unless explicitly reprocessed
+    if msg["amount"] > 3000 and not msg.get("reprocess", False):
+        raise Exception("High-value transaction requires manual review")
+    return True
 
-# --- Main Loop with graceful shutdown ---
-count = 0
+def classify_message(record):
+    msg_id = record["msg_id"]
+    if msg_id not in processed_records:
+        return "NEW"
+    elif processed_records[msg_id] == record:
+        return "DUPLICATE"
+    else:
+        return "UPDATED"
+
 try:
-    for msg in consumer:
-        record = msg.value
-        rid = record.get("id")
-        count += 1
+    for message in consumer:
+        record = message.value
+        msg_id = record["msg_id"]
 
-        # Try to process with retries
-        if not process_record(record):
-            stats["dlq"] += 1
-            stats["errors"] += 1
-            dlq_msg = {
-                "topic": msg.topic,
-                "record": record,
-                "error": "Processing failed"
-            }
-            try:
-                dlq_producer.send('dlq', dlq_msg)
-                print(f"{count} DLQ: {dlq_msg}")
-            except KafkaError as ke:
-                print(f"Failed to send to DLQ: {ke}")
-            continue
-
-        # Deduplication / Update logic
-        if rid not in seen_records:
-            seen_records[rid] = record
-            stats["new"] += 1
-            print(f"{count} NEW: {record}")
-        elif seen_records[rid] == record:
-            stats["duplicate"] += 1
-            print(f"{count} DUPLICATE: {record}")
+        # Distinguish reprocessed DLQ records
+        if record.get("reprocess", False):
+            status = "REPROCESS"
         else:
-            seen_records[rid] = record
-            stats["update"] += 1
-            print(f"{count} UPDATE: {record}")
+            status = classify_message(record)
 
-except KeyboardInterrupt:
-    print("\nConsumer stopped by user.")
-
+        try:
+            if process_message(record):
+                print(f"[{status}] {msg_id} | {record['transaction_type']} | ₱{record['amount']} | {record['location']}")
+                processed_records[msg_id] = record
+                if status == "NEW":
+                    new_count += 1
+                elif status == "UPDATED":
+                    updated_count += 1
+                elif status == "DUPLICATE":
+                    duplicate_count += 1
+                elif status == "REPROCESS":
+                    reprocess_count += 1
+                consumer.commit()
+        except Exception:
+            # Initialize retry counter safely
+            record["retry"] = record.get("retry", 0) + 1
+            retry_count += 1
+            if record["retry"] >= 3:
+                # Send to DLQ with reprocess flag reset
+                record["reprocess"] = False
+                producer.send("transactions-dlq", record)
+                print(f"[ERROR->DLQ] {msg_id} | {record['transaction_type']} | ₱{record['amount']} | {record['location']}")
+                dlq_count += 1
+            else:
+                # Retry by sending back to main topic
+                producer.send("transactions", record)
+                print(f"[RETRY] {msg_id} attempt {record['retry']}")
 finally:
-    print("Summary:", stats)
-    dlq_producer.flush()
-    dlq_producer.close()
-    consumer.close()
-
+    print("=== Summary Report ===")
+    print(f"New: {new_count}")
+    print(f"Updated: {updated_count}")
+    print(f"Duplicates: {duplicate_count}")
+    print(f"Retries: {retry_count}")
+    print(f"DLQ: {dlq_count}")
+    print(f"Reprocessed: {reprocess_count}")

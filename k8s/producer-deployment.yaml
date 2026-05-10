@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: producer-deployment
+  name: producer
 spec:
   replicas: 1
   selector:
@@ -13,6 +13,17 @@ spec:
         app: producer
     spec:
       containers:
-      - name: producer
-        image: rjmb6457/producer:latest
-        imagePullPolicy: Always
+        - name: producer
+          image: gcr.io/kafka-demo-rjmb/producer:latest
+          volumeMounts:
+            - name: data-pvc
+              mountPath: /app/extract
+            - name: archive-pvc
+              mountPath: /app/archive
+      volumes:
+        - name: data-pvc
+          persistentVolumeClaim:
+            claimName: data-pvc
+        - name: archive-pvc
+          persistentVolumeClaim:
+            claimName: archive-pvc

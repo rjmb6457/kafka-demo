@@ -1,0 +1,17 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: dlq-reprocessor
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: dlq-reprocessor
+  template:
+    metadata:
+      labels:
+        app: dlq-reprocessor
+    spec:
+      containers:
+        - name: dlq-reprocessor
+          image: gcr.io/kafka-demo-rjmb/reprocessor:latest

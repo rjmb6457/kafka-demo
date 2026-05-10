@@ -1,57 +1,75 @@
 import os
-import json
+import shutil
 import time
+from datetime import datetime, timedelta
 from kafka import KafkaProducer
-from kafka.errors import KafkaError
+import json
 
-# --- Kafka Producer Configuration ---
+EXTRACT_DIR = "/app/extract"
+ARCHIVE_DIR = "/app/archive"
+RETENTION_DAYS = 7  # adjust retention window
+KAFKA_BROKER = os.getenv("KAFKA_BROKER", "kafka-service:9092")
+TOPIC = os.getenv("TOPIC", "transactions")
+
+# Track seen message IDs for duplicate detection
+seen_ids = set()
+
+# Initialize Kafka producer
 producer = KafkaProducer(
-    bootstrap_servers='localhost:9092',
-    value_serializer=lambda v: json.dumps(v).encode('utf-8'),
-    acks='all',        # wait for all replicas to acknowledge
-    retries=5,         # retry sending if broker is unavailable
-    linger_ms=10       # small batching delay for efficiency
+    bootstrap_servers=[KAFKA_BROKER],
+    value_serializer=lambda v: json.dumps(v).encode("utf-8"),
+    retries=3,
+    acks="all"
 )
 
-EXTRACT_DIR = "./extract"
-ARCHIVE_DIR = "./archive"
+def process_file(file_path):
+    print(f"[START] Processing file: {file_path}", flush=True)
+    with open(file_path, "r") as f:
+        for line in f:
+            try:
+                record = json.loads(line.strip())
+                msg_id = record.get("msg_id")
 
-# --- Counters ---
-stats = {"sent": 0, "errors": 0, "files_processed": 0}
+                if msg_id in seen_ids:
+                    print(f"[DUPLICATE] Skipping record {msg_id}", flush=True)
+                else:
+                    seen_ids.add(msg_id)
+                    print(f"[NEW] Sending record {msg_id}: {record}", flush=True)
+                    producer.send(TOPIC, record)
 
-# --- Send Function with Error Handling ---
-def send_record(record):
-    try:
-        future = producer.send(record["topic"], record)
-        metadata = future.get(timeout=10)  # synchronous send, waits for ack
-        stats["sent"] += 1
-        print(f"Produced to {metadata.topic}: {record}")
-    except KafkaError as e:
-        stats["errors"] += 1
-        print(f"Error producing record {record}: {e}")
+            except Exception as e:
+                print(f"[ERROR] Failed to process line: {line.strip()} | {e}", flush=True)
 
-# --- Main Loop: Process files in extract directory ---
-for filename in os.listdir(EXTRACT_DIR):
-    if filename.endswith(".json"):
-        filepath = os.path.join(EXTRACT_DIR, filename)
-        try:
-            with open(filepath) as f:
-                records = json.load(f)
-                for rec in records:
-                    send_record(rec)
-                    time.sleep(0.2)  # simulate staggered ingestion
-            stats["files_processed"] += 1
+    producer.flush()
+    print(f"[END] Finished sending records from {file_path}", flush=True)
 
-            # Move file to archive after successful processing
-            archive_path = os.path.join(ARCHIVE_DIR, filename.replace(".json", "_done.json"))
-            os.rename(filepath, archive_path)
-            print(f"Archived {filename} -> {archive_path}")
+def archive_file(file_path):
+    base = os.path.basename(file_path)
+    new_name = base + "_done"
+    dest = os.path.join(ARCHIVE_DIR, new_name)
+    shutil.move(file_path, dest)
+    print(f"[ARCHIVE] Moved file to {dest}", flush=True)
 
-        except Exception as e:
-            print(f"Error reading {filename}: {e}")
+    # cleanup old files
+    cutoff = datetime.now() - timedelta(days=RETENTION_DAYS)
+    for f in os.listdir(ARCHIVE_DIR):
+        full_path = os.path.join(ARCHIVE_DIR, f)
+        if os.path.isfile(full_path):
+            mtime = datetime.fromtimestamp(os.path.getmtime(full_path))
+            if mtime < cutoff:
+                os.remove(full_path)
+                print(f"[CLEANUP] Deleted old archive file: {full_path}", flush=True)
 
-# --- Finalize ---
-producer.flush()
-producer.close()
-print("Summary:", stats)
+def run():
+    os.makedirs(ARCHIVE_DIR, exist_ok=True)
+    print("[INIT] Producer started, watching /app/extract...", flush=True)
+    while True:
+        for f in os.listdir(EXTRACT_DIR):
+            if f.startswith("transactions_") and f.endswith(".jsonl"):
+                file_path = os.path.join(EXTRACT_DIR, f)
+                process_file(file_path)
+                archive_file(file_path)
+        time.sleep(5)
 
+if __name__ == "__main__":
+    run()

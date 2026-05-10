@@ -1,9 +1,5 @@
 FROM python:3.10-slim
-
 WORKDIR /app
-COPY requirements.txt .
-RUN pip install -r requirements.txt
-
-COPY consumer/consumer.py .
-
+COPY consumer.py .
+RUN pip install --no-cache-dir kafka-python
 CMD ["python", "consumer.py"]

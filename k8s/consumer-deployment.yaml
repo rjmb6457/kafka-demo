@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: consumer-deployment
+  name: consumer
 spec:
   replicas: 1
   selector:
@@ -13,6 +13,5 @@ spec:
         app: consumer
     spec:
       containers:
-      - name: consumer
-        image: rjmb6457/consumer:latest
-        imagePullPolicy: Always
+        - name: consumer
+          image: gcr.io/kafka-demo-rjmb/consumer:latest

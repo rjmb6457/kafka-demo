@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: data-generator
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: data-generator
+  template:
+    metadata:
+      labels:
+        app: data-generator
+    spec:
+      containers:
+      - name: data-generator
+        image: gcr.io/kafka-demo-rjmb/data-generator:latest
+        imagePullPolicy: Always
+        command: ["python", "-u", "data_generator.py"]
+        volumeMounts:
+        - name: data-pvc
+          mountPath: /app/extract   # match producer mount path
+      volumes:
+      - name: data-pvc
+        persistentVolumeClaim:
+          claimName: data-pvc       # same PVC claim as producer
