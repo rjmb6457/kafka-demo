@@ -22,8 +22,8 @@ jobs:
 
       - name: Authenticate Service Account
         run: |
-          echo "${{ secrets.GCP_SA_KEY }}" > ${HOME}/gcp-key.json
-          gcloud auth activate-service-account --key-file=${HOME}/gcp-key.json
+          printf '%s' "${{ secrets.GCP_SA_KEY }}" > gcp-key.json
+          gcloud auth activate-service-account --key-file=gcp-key.json
           gcloud config set project kafka-demo-rjmb
 
       - name: Configure Docker for GCR
