@@ -44,7 +44,10 @@ jobs:
           docker build -t gcr.io/kafka-demo-rjmb/reprocessor:latest -f reprocessor/Dockerfile reprocessor/
           docker push gcr.io/kafka-demo-rjmb/reprocessor:latest
 
+      - name: Install GKE auth plugin
+        run: gcloud components install gke-gcloud-auth-plugin --quiet
+
       - name: Deploy to GKE
         run: |
           gcloud container clusters get-credentials kafka-demo-cluster --zone asia-southeast1-a --project kafka-demo-rjmb
-          kubectl apply -f k8s/demo-stack.yaml
+          kubectl apply -f k8s/
