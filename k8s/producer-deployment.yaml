@@ -17,3 +17,15 @@ spec:
           image: gcr.io/kafka-demo-rjmb/producer:latest
           ports:
             - containerPort: 8080
+          volumeMounts:
+            - name: data-pvc
+              mountPath: /app/extract
+            - name: archive-pvc
+              mountPath: /app/archive
+      volumes:
+        - name: data-pvc
+          persistentVolumeClaim:
+            claimName: data-pvc
+        - name: archive-pvc
+          persistentVolumeClaim:
+            claimName: archive-pvc
