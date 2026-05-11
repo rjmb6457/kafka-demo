@@ -1,10 +1,11 @@
 from kafka import KafkaConsumer, KafkaProducer
 import json
+from audit_logger import AuditLogger
 
 dlq_consumer = KafkaConsumer(
     "transactions-dlq",
     bootstrap_servers="kafka-service:9092",
-    group_id="dlq-reprocessor-group",   # required for commits
+    group_id="dlq-reprocessor-group",
     auto_offset_reset="earliest",
     enable_auto_commit=False,
     value_deserializer=lambda v: json.loads(v.decode("utf-8"))
@@ -15,21 +16,20 @@ producer = KafkaProducer(
     value_serializer=lambda v: json.dumps(v).encode("utf-8")
 )
 
-reprocess_count = 0
+audit = AuditLogger("Reprocessor")
 
 try:
     for message in dlq_consumer:
         record = message.value
-        record["reprocess"] = True  # mark as reprocessed
+        record["reprocess"] = True
         producer.send("transactions", record)
         dlq_consumer.commit()
-        reprocess_count += 1
-        print(f"[REPROCESS] {record['msg_id']} | {record['transaction_type']} | ₱{record['amount']} | {record['location']}")
+        print(f"[REPROCESS] {record['msg_id']} | {record['transaction_type']} | ₱{record['amount']} | {record['location']}", flush=True)
+        audit.log("reprocessed", f"Reprocessed msg_id={record['msg_id']} from DLQ")
 except KeyboardInterrupt:
     print("\nDLQ Reprocessor stopped by user.")
 finally:
-    print("=== DLQ Reprocessor Summary ===")
-    print(f"Reprocessed: {reprocess_count}")
+    audit.report()
     producer.flush()
     producer.close()
     dlq_consumer.close()

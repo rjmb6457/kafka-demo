@@ -1,8 +1,7 @@
-from kafka import KafkaConsumer, KafkaProducer, TopicPartition
+from kafka import KafkaConsumer, KafkaProducer
 import json
-import time
+from audit_logger import AuditLogger
 
-# Subscribe to both main and DLQ topics
 consumer = KafkaConsumer(
     "transactions", "transactions-dlq",
     bootstrap_servers="kafka-service:9092",
@@ -17,14 +16,10 @@ producer = KafkaProducer(
     value_serializer=lambda v: json.dumps(v).encode("utf-8")
 )
 
-# Track processed records by msg_id
-processed_records = {}  # msg_id -> last payload
-
-# Counters for reporting
-new_count = updated_count = duplicate_count = retry_count = dlq_count = reprocess_count = 0
+processed_records = {}
+audit = AuditLogger("Consumer")
 
 def process_message(msg):
-    # Simulate failure for high-value transactions unless explicitly reprocessed
     if msg["amount"] > 3000 and not msg.get("reprocess", False):
         raise Exception("High-value transaction requires manual review")
     return True
@@ -38,23 +33,18 @@ def classify_message(record):
     else:
         return "UPDATED"
 
-def print_lag():
-    # Print lag info for each assigned partition
+def update_lag():
     for tp in consumer.assignment():
-        committed = consumer.committed(tp)
-        position = consumer.position(tp)
         end_offset = consumer.end_offsets([tp])[tp]
+        position = consumer.position(tp)
         lag = end_offset - (position or 0)
-        print(f"[LAG] Topic={tp.topic} Partition={tp.partition} "
-              f"Committed={committed} Position={position} End={end_offset} Lag={lag}")
+        audit.set_lag(lag)
 
 try:
-    last_report = time.time()
     for message in consumer:
         record = message.value
         msg_id = record["msg_id"]
 
-        # Distinguish reprocessed DLQ records
         if record.get("reprocess", False):
             status = "REPROCESS"
         else:
@@ -62,50 +52,26 @@ try:
 
         try:
             if process_message(record):
-                print(f"[{status}] {msg_id} | {record['transaction_type']} | ₱{record['amount']} | {record['location']}")
+                print(f"[{status}] {msg_id} | {record['transaction_type']} | ₱{record['amount']} | {record['location']}", flush=True)
                 processed_records[msg_id] = record
-                if status == "NEW":
-                    new_count += 1
-                elif status == "UPDATED":
-                    updated_count += 1
-                elif status == "DUPLICATE":
-                    duplicate_count += 1
-                elif status == "REPROCESS":
-                    reprocess_count += 1
+                audit.log("consumed", f"{status} msg_id={msg_id} offset={message.offset}")
                 consumer.commit()
         except Exception:
-            # Initialize retry counter safely
             record["retry"] = record.get("retry", 0) + 1
-            retry_count += 1
+            audit.log("retries", f"Retry msg_id={msg_id} attempt={record['retry']}")
             if record["retry"] >= 3:
-                # Send to DLQ with reprocess flag reset
                 record["reprocess"] = False
                 producer.send("transactions-dlq", record)
-                print(f"[ERROR->DLQ] {msg_id} | {record['transaction_type']} | ₱{record['amount']} | {record['location']}")
-                dlq_count += 1
+                print(f"[ERROR->DLQ] {msg_id} | {record['transaction_type']} | ₱{record['amount']} | {record['location']}", flush=True)
+                audit.log("dlq", f"Sent msg_id={msg_id} to DLQ")
             else:
-                # Retry by sending back to main topic
                 producer.send("transactions", record)
-                print(f"[RETRY] {msg_id} attempt {record['retry']}")
+                print(f"[RETRY] {msg_id} attempt {record['retry']}", flush=True)
 
-        # Periodic reporting every 30 seconds
-        if time.time() - last_report > 30:
-            print("=== Interim Report ===")
-            print(f"New: {new_count}")
-            print(f"Updated: {updated_count}")
-            print(f"Duplicates: {duplicate_count}")
-            print(f"Retries: {retry_count}")
-            print(f"DLQ: {dlq_count}")
-            print(f"Reprocessed: {reprocess_count}")
-            print_lag()
-            last_report = time.time()
+        update_lag()
 
 finally:
-    print("=== Final Summary Report ===")
-    print(f"New: {new_count}")
-    print(f"Updated: {updated_count}")
-    print(f"Duplicates: {duplicate_count}")
-    print(f"Retries: {retry_count}")
-    print(f"DLQ: {dlq_count}")
-    print(f"Reprocessed: {reprocess_count}")
-    print_lag()
+    audit.report()
+    consumer.close()
+    producer.close()
+    print("Consumer stopped.")
