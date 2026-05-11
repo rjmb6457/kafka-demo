@@ -7,12 +7,12 @@ import json
 
 EXTRACT_DIR = "/app/extract"
 ARCHIVE_DIR = "/app/archive"
-RETENTION_DAYS = 7  # adjust retention window
+RETENTION_DAYS = 7  # number of retention days for archived files
 KAFKA_BROKER = os.getenv("KAFKA_BROKER", "kafka-service:9092")
 TOPIC = os.getenv("TOPIC", "transactions")
 
-# Track seen message IDs for duplicate detection
-seen_ids = set()
+# Track seen records by ID, storing the last payload
+seen_records = {}
 
 # Initialize Kafka producer
 producer = KafkaProducer(
@@ -30,12 +30,21 @@ def process_file(file_path):
                 record = json.loads(line.strip())
                 msg_id = record.get("msg_id")
 
-                if msg_id in seen_ids:
-                    print(f"[DUPLICATE] Skipping record {msg_id}", flush=True)
-                else:
-                    seen_ids.add(msg_id)
+                if msg_id not in seen_records:
+                    # First time we see this ID
+                    seen_records[msg_id] = record
                     print(f"[NEW] Sending record {msg_id}: {record}", flush=True)
                     producer.send(TOPIC, record)
+
+                elif seen_records[msg_id] != record:
+                    # Same ID but payload changed → UPDATE
+                    seen_records[msg_id] = record
+                    print(f"[UPDATE] Sending updated record {msg_id}: {record}", flush=True)
+                    producer.send(TOPIC, record)
+
+                else:
+                    # Same ID, same payload → DUPLICATE
+                    print(f"[DUPLICATE] Skipping record {msg_id}", flush=True)
 
             except Exception as e:
                 print(f"[ERROR] Failed to process line: {line.strip()} | {e}", flush=True)
