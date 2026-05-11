@@ -15,3 +15,5 @@ spec:
       containers:
         - name: dlq-reprocessor
           image: gcr.io/kafka-demo-rjmb/reprocessor:latest
+          ports:
+            - containerPort: 8080

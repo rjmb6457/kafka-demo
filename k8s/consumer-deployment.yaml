@@ -15,3 +15,5 @@ spec:
       containers:
         - name: consumer
           image: gcr.io/kafka-demo-rjmb/consumer:latest
+          ports:
+            - containerPort: 8080

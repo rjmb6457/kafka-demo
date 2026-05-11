@@ -13,13 +13,11 @@ jobs:
       - name: Checkout source
         uses: actions/checkout@v3
 
-      # Authenticate with GCP using the service account JSON secret
       - name: Authenticate to Google Cloud
         uses: google-github-actions/auth@v2
         with:
           credentials_json: ${{ secrets.GCP_SA_KEY }}
 
-      # Install gcloud CLI
       - name: Set up gcloud
         uses: google-github-actions/setup-gcloud@v2
         with:
@@ -29,23 +27,33 @@ jobs:
       - name: Configure Docker for GCR
         run: gcloud auth configure-docker gcr.io --quiet
 
+      # Build & Push Producer
       - name: Build & Push Producer
         run: |
-          docker build -t gcr.io/kafka-demo-rjmb/producer:latest -f producer/Dockerfile producer/
-          docker push gcr.io/kafka-demo-rjmb/producer:latest
+          docker build -t gcr.io/kafka-demo-rjmb/producer:${{ github.sha }} -f producer/Dockerfile producer/
+          docker push gcr.io/kafka-demo-rjmb/producer:${{ github.sha }}
 
+      # Build & Push Consumer
       - name: Build & Push Consumer
         run: |
-          docker build -t gcr.io/kafka-demo-rjmb/consumer:latest -f consumer/Dockerfile consumer/
-          docker push gcr.io/kafka-demo-rjmb/consumer:latest
+          docker build -t gcr.io/kafka-demo-rjmb/consumer:${{ github.sha }} -f consumer/Dockerfile consumer/
+          docker push gcr.io/kafka-demo-rjmb/consumer:${{ github.sha }}
 
+      # Build & Push Reprocessor
       - name: Build & Push Reprocessor
         run: |
-          docker build -t gcr.io/kafka-demo-rjmb/reprocessor:latest -f reprocessor/Dockerfile reprocessor/
-          docker push gcr.io/kafka-demo-rjmb/reprocessor:latest
+          docker build -t gcr.io/kafka-demo-rjmb/reprocessor:${{ github.sha }} -f reprocessor/Dockerfile reprocessor/
+          docker push gcr.io/kafka-demo-rjmb/reprocessor:${{ github.sha }}
 
       - name: Install GKE auth plugin
         run: gcloud components install gke-gcloud-auth-plugin --quiet
+
+      # Update manifests with commit SHA
+      - name: Update manifests with commit SHA
+        run: |
+          sed -i "s|gcr.io/kafka-demo-rjmb/producer:.*|gcr.io/kafka-demo-rjmb/producer:${{ github.sha }}|g" k8s/producer-deployment.yaml
+          sed -i "s|gcr.io/kafka-demo-rjmb/consumer:.*|gcr.io/kafka-demo-rjmb/consumer:${{ github.sha }}|g" k8s/consumer-deployment.yaml
+          sed -i "s|gcr.io/kafka-demo-rjmb/reprocessor:.*|gcr.io/kafka-demo-rjmb/reprocessor:${{ github.sha }}|g" k8s/dlq-reprocessor-deployment.yaml
 
       - name: Deploy to GKE
         run: |
