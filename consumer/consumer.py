@@ -1,5 +1,6 @@
-from kafka import KafkaConsumer, KafkaProducer
+from kafka import KafkaConsumer, KafkaProducer, TopicPartition
 import json
+import time
 
 # Subscribe to both main and DLQ topics
 consumer = KafkaConsumer(
@@ -37,7 +38,18 @@ def classify_message(record):
     else:
         return "UPDATED"
 
+def print_lag():
+    # Print lag info for each assigned partition
+    for tp in consumer.assignment():
+        committed = consumer.committed(tp)
+        position = consumer.position(tp)
+        end_offset = consumer.end_offsets([tp])[tp]
+        lag = end_offset - (position or 0)
+        print(f"[LAG] Topic={tp.topic} Partition={tp.partition} "
+              f"Committed={committed} Position={position} End={end_offset} Lag={lag}")
+
 try:
+    last_report = time.time()
     for message in consumer:
         record = message.value
         msg_id = record["msg_id"]
@@ -75,11 +87,25 @@ try:
                 # Retry by sending back to main topic
                 producer.send("transactions", record)
                 print(f"[RETRY] {msg_id} attempt {record['retry']}")
+
+        # Periodic reporting every 30 seconds
+        if time.time() - last_report > 30:
+            print("=== Interim Report ===")
+            print(f"New: {new_count}")
+            print(f"Updated: {updated_count}")
+            print(f"Duplicates: {duplicate_count}")
+            print(f"Retries: {retry_count}")
+            print(f"DLQ: {dlq_count}")
+            print(f"Reprocessed: {reprocess_count}")
+            print_lag()
+            last_report = time.time()
+
 finally:
-    print("=== Summary Report ===")
+    print("=== Final Summary Report ===")
     print(f"New: {new_count}")
     print(f"Updated: {updated_count}")
     print(f"Duplicates: {duplicate_count}")
     print(f"Retries: {retry_count}")
     print(f"DLQ: {dlq_count}")
     print(f"Reprocessed: {reprocess_count}")
+    print_lag()
