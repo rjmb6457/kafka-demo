@@ -1,6 +1,6 @@
-FROM python:3.10-slim
+FROM python:3.11-slim
 WORKDIR /app
-COPY consumer.py .
-COPY ../audit_logger.py .
+COPY audit_logger.py .
+COPY consumer/consumer.py .
 RUN pip install --no-cache-dir kafka-python
 CMD ["python", "consumer.py"]
