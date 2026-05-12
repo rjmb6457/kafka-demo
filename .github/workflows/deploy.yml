@@ -30,19 +30,19 @@ jobs:
       # Build & Push Producer
       - name: Build & Push Producer
         run: |
-          docker build -t gcr.io/kafka-demo-rjmb/producer:${{ github.sha }} -f producer/Dockerfile producer/
+          docker build -t gcr.io/kafka-demo-rjmb/producer:${{ github.sha }} -f producer/Dockerfile .
           docker push gcr.io/kafka-demo-rjmb/producer:${{ github.sha }}
 
       # Build & Push Consumer
       - name: Build & Push Consumer
         run: |
-          docker build -t gcr.io/kafka-demo-rjmb/consumer:${{ github.sha }} -f consumer/Dockerfile consumer/
+          docker build -t gcr.io/kafka-demo-rjmb/consumer:${{ github.sha }} -f consumer/Dockerfile .
           docker push gcr.io/kafka-demo-rjmb/consumer:${{ github.sha }}
 
       # Build & Push Reprocessor
       - name: Build & Push Reprocessor
         run: |
-          docker build -t gcr.io/kafka-demo-rjmb/reprocessor:${{ github.sha }} -f reprocessor/Dockerfile reprocessor/
+          docker build -t gcr.io/kafka-demo-rjmb/reprocessor:${{ github.sha }} -f reprocessor/Dockerfile .
           docker push gcr.io/kafka-demo-rjmb/reprocessor:${{ github.sha }}
 
       - name: Install GKE auth plugin
