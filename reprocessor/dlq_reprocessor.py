@@ -2,6 +2,7 @@ from kafka import KafkaConsumer, KafkaProducer
 import json
 from audit_logger import AuditLogger
 
+# DLQ reprocessor subscribes ONLY to the DLQ topic
 dlq_consumer = KafkaConsumer(
     "transactions-dlq",
     bootstrap_servers="kafka-service:9092",
@@ -21,6 +22,7 @@ audit = AuditLogger("Reprocessor")
 try:
     for message in dlq_consumer:
         record = message.value
+        # Mark record for reprocessing so consumer bypasses validation
         record["reprocess"] = True
         producer.send("transactions", record)
         dlq_consumer.commit()
