@@ -1,4 +1,5 @@
 import time, threading
+from datetime import datetime
 
 class AuditLogger:
     def __init__(self, component_name, interval=30):
@@ -27,7 +28,8 @@ class AuditLogger:
 
     def report(self):
         elapsed = int(time.time() - self.start_time)
-        print(f"[METRICS][{self.component}] after {elapsed}s | "
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        print(f"[METRICS][{self.component}] {timestamp} | Elapsed={elapsed}s | "
               f"Produced={self.counts['produced']} | "
               f"Consumed={self.counts['consumed']} | "
               f"Retries={self.counts['retries']} | "
