@@ -21,12 +21,19 @@ producer = KafkaProducer(
     acks="all"
 )
 
-audit = AuditLogger("Producer")
+# heartbeat every 60s
+audit = AuditLogger("Producer", interval=60)
 
 def process_file(file_path):
-    print(f"[START] Processing file: {file_path}", flush=True)
     with open(file_path, "r") as f:
-        for line in f:
+        lines = f.readlines()
+        source_count = len(lines)
+        audit.set_source_records(source_count, file_path)
+
+        produced_count = 0
+        print(f"[START] Processing file: {file_path} with {source_count} records", flush=True)
+
+        for line in lines:
             try:
                 record = json.loads(line.strip())
                 msg_id = record.get("msg_id")
@@ -36,6 +43,7 @@ def process_file(file_path):
                     print(f"[NEW] Sending record {msg_id}: {record}", flush=True)
                     future = producer.send(TOPIC, record)
                     metadata = future.get(timeout=10)
+                    produced_count += 1
                     audit.log("produced", f"Produced msg_id={msg_id} offset={metadata.offset}")
 
                 elif seen_records[msg_id] != record:
@@ -43,6 +51,7 @@ def process_file(file_path):
                     print(f"[UPDATE] Sending updated record {msg_id}: {record}", flush=True)
                     future = producer.send(TOPIC, record)
                     metadata = future.get(timeout=10)
+                    produced_count += 1
                     audit.log("produced", f"Updated msg_id={msg_id} offset={metadata.offset}")
 
                 else:
@@ -50,8 +59,15 @@ def process_file(file_path):
 
             except Exception as e:
                 print(f"[ERROR] Failed to process line: {line.strip()} | {e}", flush=True)
+                audit.log("final_fail", f"Failed to send record: {e}")
 
     producer.flush()
+    # End validation
+    if produced_count == source_count:
+        print(f"[SUCCESS][Producer] Delivered all {produced_count}/{source_count} records from {file_path}", flush=True)
+    else:
+        print(f"[ERROR][Producer] Mismatch for {file_path}: SourceRecords={source_count}, Produced={produced_count}", flush=True)
+
     print(f"[END] Finished sending records from {file_path}", flush=True)
 
 def archive_file(file_path):

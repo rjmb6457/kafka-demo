@@ -17,7 +17,8 @@ producer = KafkaProducer(
 )
 
 processed_records = {}
-audit = AuditLogger("Consumer")
+audit = AuditLogger("Consumer", interval=60)  # heartbeat every 60s
+consumed_count = 0
 
 def process_message(msg):
     if msg["amount"] > 3000 and not msg.get("reprocess", False):
@@ -45,15 +46,13 @@ try:
         record = message.value
         msg_id = record["msg_id"]
 
-        if record.get("reprocess", False):
-            status = "REPROCESS"
-        else:
-            status = classify_message(record)
+        status = "REPROCESS" if record.get("reprocess", False) else classify_message(record)
 
         try:
             if process_message(record):
                 print(f"[{status}] {msg_id} | {record['transaction_type']} | ₱{record['amount']} | {record['location']}", flush=True)
                 processed_records[msg_id] = record
+                consumed_count += 1
                 audit.log("consumed", f"{status} msg_id={msg_id} offset={message.offset}")
                 consumer.commit()
         except Exception:
@@ -71,6 +70,7 @@ try:
         update_lag()
 
 finally:
+    print(f"[END][Consumer] Total consumed={consumed_count}", flush=True)
     audit.report()
     consumer.close()
     producer.close()
