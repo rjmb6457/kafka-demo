@@ -46,7 +46,12 @@ try:
         record = message.value
         msg_id = record["msg_id"]
 
-        status = "REPROCESS" if record.get("reprocess", False) else classify_message(record)
+        if record.get("reprocess", False):
+            status = "REPROCESS"
+            # increment reprocessed counter in consumer metrics
+            audit.log("reprocessed", f"Reprocessed msg_id={msg_id} offset={message.offset}")
+        else:
+            status = classify_message(record)
 
         try:
             if process_message(record):
