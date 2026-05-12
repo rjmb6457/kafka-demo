@@ -8,7 +8,7 @@ from audit_logger import AuditLogger
 
 EXTRACT_DIR = "/app/extract"
 ARCHIVE_DIR = "/app/archive"
-RETENTION_DAYS = 7
+RETENTION_DAYS = 1
 KAFKA_BROKER = os.getenv("KAFKA_BROKER", "kafka-service:9092")
 TOPIC = os.getenv("TOPIC", "transactions")
 
